@@ -8,10 +8,10 @@
                         basic command-line interpreter
 
 1 - REPL - a read-eval-print loop - Link with PATH:
-    |   -> prompt "intek-sh$ " -> parse input with format <command> + < *args>
+    |   -> prompt "intek-sh$ " -> parse input_ with format <command> + < *args>
         -> parse $PATH string to have directories -> call subprocess
         -> wait for it to finish -> display the prompt again
-        -> error message if the command notfound or no permission to execute it.
+        -> error message if the command notfound or no permission to execute.
 
 2 - Built-in Functions:
     cd [directory]
@@ -24,52 +24,11 @@
 
 =============================================================================
 """
-import os, sys, subprocess
+import os
+import subprocess
 
-def parse():
-    parser = argparse.ArgumentParser(prog='basic command-line interpreter',\
-    usage=usage)
-    parser.add_argument('command')
-    parser.add_argument('args', nargs='*')
-    return parser.parse_args()
-
-
-# def get_path_value():
-#     # with open('path', 'w') as f:
-#         # path_value = os.system('echo $PATH')
-#         # f.write(str(path_value))
-#     os.system('echo $PATH > path')
-#     with open('path', 'r') as f:
-#         paths = f.read()
-#         paths = paths.split(':')
-#     paths_dict = dict()
-#     # for path in paths:
-#     #     m = os.listdir(path)
-#     #     print(m)
 
 def cd(args):
-    # if len(args) == 0:
-    #     try:
-    #         home = os.environ['HOME']
-    #         os.chdir(home)
-    #     except KeyError:
-    #         print('bash: cd: HOME not set')
-    #         return
-    # else:
-    #     print('Args:', args)
-    #     args = args[0]
-    #     if args == '' or '~' or '/home':
-    #         try:
-    #             home = os.environ['HOME']
-    #             os.chdir(home)
-    #         except KeyError:
-    #             print('bash: cd: HOME not set')
-    #     else:
-    #         try:
-    #             os.chdir(args)
-    #         except FileNotFoundError as error:
-    #             print('bash: cd: %s: No such file or directory' % (args))
-
     if len(args) > 0:
         args = args[0]
     if args == [] or args == '~' or args == '/home':
@@ -77,40 +36,71 @@ def cd(args):
             home = os.environ['HOME']
             os.chdir(home)
         except KeyError:
-            print('bash: cd: HOME not set')
+            print('intek-sh: cd: HOME not set')
     else:
         try:
             os.chdir(args)
-        except FileNotFoundError as error:
-            print('bash: cd: %s: No such file or directory' % (args))
+        except FileNotFoundError:
+            print('intek-sh: cd: %s: No such file or directory' % (args))
 
 
 def printenv(args):
-    for i in args:
-        try:
-            print(os.environ[i])
-        except KeyError:
-            return
+    print('args:', args)
+    if args == []:
+        for i in os.environ:
+            print(i + '=' + os.environ[i])
+    else:
+        for i in args:
+            try:
+                print(os.environ[i])
+            except KeyError:
+                return
+
 
 def export(args):
-    args=args[0].split('=')
+    args = args[0].split('=')
     os.environ[args[0]] = args[1]
+
 
 def unset(args):
     for i in args:
         try:
             del os.environ[i]
-        except KeyError as e:
-            print('bash: unset: `%s\': not a valid identifier' % (i))
+        except KeyError:
+            print('intek-sh: unset: `%s\': not a valid identifier' % (i))
+
+
+def exit(args):
+    print('exit')
+    if args and len(args[0]) > 1:
+        print('intek-sh: exit:')
+    flag = 0
+    os._exit(0)
+
+
+def check_path(command):
+    paths = os.environ['PATH'].split(':')
+    for i in paths:
+        path = i + '/' + command
+        if os.path.exists(path):
+            return True
+    else:
+        print('intek-sh: %s: command not found' % (command))
+        return False
+
 
 def execute(command, args):
-    try:
-        subprocess.run(command)
-    except Exception as e:
-        print('Dinh chuong:', e)
+    if check_path(command):
+        args.insert(0, command)
+        try:
+            subprocess.run(args)
+        except Exception as e:
+            return
+    else:
+        return
 
-def input_parse():
-    input_ = input('intek-sh$ ')
+
+def args_parse(input_):
     input_ = input_.split(' ')
     input_ = [x for x in input_ if x]
     command = input_[0]
@@ -118,16 +108,25 @@ def input_parse():
     args = [x for x in input_ if x]
     return command, args
 
+
 def main():
-    built_ins = ('cd', 'printenv', 'export', 'unset')
-    while True:
-        command, args = input_parse()
-        if command in built_ins:
-            exec('%s(args)' % (command))
-        elif 'exit' in command:
+    built_ins = ('cd', 'printenv', 'export', 'unset', 'exit')
+    input_ = input('intek-sh$ ')
+    flag = 1
+    while flag == 1:
+        try:
+            while input_ == '':
+                input_ = input('intek-sh$ ')
+        except EOFError:
             return
-        else:
-            execute(command, args)
+        input_ = input_.split('\\n')
+        for i in input_:
+            command, args = args_parse(i)
+            if command in built_ins:
+                exec('%s(args)' % (command))
+            else:
+                execute(command, args)
+        input_ = ''
 
 
 if __name__ == '__main__':
