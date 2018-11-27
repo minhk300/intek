@@ -67,22 +67,29 @@ def unset(args):
         try:
             del os.environ[i]
         except KeyError:
-            print('intek-sh: unset: `%s\': not a valid identifier' % (i))
+            return
 
 
 def exit(args):
+    flag = False
     print('exit')
-    if args and len(args[0]) > 1:
+    if args[0].isdigit():
+        return
+    else:
         print('intek-sh: exit:')
-    flag = 0
-    os._exit(0)
+        return
 
 
 def check_path(command):
-    paths = os.environ['PATH'].split(':')
+    try:
+        paths = os.environ['PATH'].split(':')
+    except KeyError:
+        print('Path teo cmnr')
+        return
     for i in paths:
         path = i + '/' + command
         if os.path.exists(path):
+            print('$Path exists')
             return True
     else:
         print('intek-sh: %s: command not found' % (command))
@@ -90,14 +97,18 @@ def check_path(command):
 
 
 def execute(command, args):
-    if check_path(command):
+    if command[:2] == './':
+        try:
+            subprocess.run(command)
+        except Exception as e:
+            print('intek-sh: %s: Permission denied' % (command))
+            return
+    elif check_path(command):
         args.insert(0, command)
         try:
             subprocess.run(args)
         except Exception as e:
             return
-    else:
-        return
 
 
 def args_parse(input_):
@@ -111,22 +122,23 @@ def args_parse(input_):
 
 def main():
     built_ins = ('cd', 'printenv', 'export', 'unset', 'exit')
-    input_ = input('intek-sh$ ')
-    flag = 1
-    while flag == 1:
+    input_ = None
+    while input_ != 'exit':
         try:
-            while input_ == '':
-                input_ = input('intek-sh$ ')
+            input_ = input('intek-sh$ ')
         except EOFError:
             return
         input_ = input_.split('\\n')
-        for i in input_:
-            command, args = args_parse(i)
-            if command in built_ins:
-                exec('%s(args)' % (command))
-            else:
-                execute(command, args)
-        input_ = ''
+        if input_ != ['']:
+            for i in input_:
+                command, args = args_parse(i)
+                if command in built_ins:
+                    exec('%s(args)' % (command))                
+                else:
+                    execute(command, args)
+        else:
+            continue
+    exit()
 
 
 if __name__ == '__main__':
